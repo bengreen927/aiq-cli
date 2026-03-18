@@ -14,3 +14,4 @@ htmlcov/
 .env
 .venv/
 venv/
+*.pdf
