@@ -1,0 +1,27 @@
+name: Bug Report
+description: Report a bug in AIQ
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened? What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AIQ Version
+      description: Output of aiq --version
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
