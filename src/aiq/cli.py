@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -12,6 +13,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from aiq.api.client import AIQClient
 from aiq.auth.token_store import TokenStore
 from aiq.extractor.macf import MacfExtractor
 from aiq.models import UserProfile
@@ -187,7 +189,16 @@ def scan() -> None:
 @click.option(
     "--auto-approve", is_flag=True, default=False, help="Skip interactive review, approve all."
 )
-def evaluate(output: str, auto_approve: bool) -> None:
+@click.option(
+    "--role",
+    type=click.Choice(
+        ["engineering", "product", "regulatory", "executive", "marketing", "data_analytics", "design"],
+        case_sensitive=False,
+    ),
+    default=None,
+    help="Role category for evaluation.",
+)
+def evaluate(output: str, auto_approve: bool, role: Optional[str]) -> None:  # noqa: UP045
     """Run a full AIQ evaluation."""
     console.print()
     console.print(
@@ -202,7 +213,7 @@ def evaluate(output: str, auto_approve: bool) -> None:
     company_name = profile.company_name if profile else None
 
     # --- Step 1: Scan ---
-    console.print("[bold]Step 1/4:[/bold] Scanning AI setup...")
+    console.print("[bold]Step 1/7:[/bold] Scanning AI setup...")
     registry = ScannerRegistry.default()
     all_results = registry.scan_all()
     all_items = [item for result in all_results for item in result.items]
@@ -212,7 +223,7 @@ def evaluate(output: str, auto_approve: bool) -> None:
     console.print()
 
     # --- Step 2: Extract MACF ---
-    console.print("[bold]Step 2/4:[/bold] Extracting configuration (MACF)...")
+    console.print("[bold]Step 2/7:[/bold] Extracting configuration (MACF)...")
     extractor = MacfExtractor()
     macf_doc = extractor.extract(all_items, evaluations=[])
     total_entries = (
@@ -227,7 +238,7 @@ def evaluate(output: str, auto_approve: bool) -> None:
     console.print()
 
     # --- Step 3: Scrub PII ---
-    console.print("[bold]Step 3/4:[/bold] Scrubbing PII...")
+    console.print("[bold]Step 3/7:[/bold] Scrubbing PII...")
     scrubber = PiiScrubber(company_name=company_name)
     macf_json = macf_doc.model_dump_json(indent=2)
     scrub_result = scrubber.scrub_macf(macf_json)
@@ -241,7 +252,7 @@ def evaluate(output: str, auto_approve: bool) -> None:
     console.print()
 
     # --- Step 4: Interactive Review ---
-    console.print("[bold]Step 4/4:[/bold] Pre-transmission review...")
+    console.print("[bold]Step 4/7:[/bold] Pre-transmission review...")
     session = ReviewSession(macf_doc)
 
     if auto_approve or not sys.stdin.isatty():
@@ -298,44 +309,101 @@ def evaluate(output: str, auto_approve: bool) -> None:
     console.print(f"  [green]{approved_count}[/green] entries approved for transmission.")
     console.print()
 
-    # --- API Stub ---
-    console.print("[bold]Sending to API...[/bold] (stub — API not yet live)")
-    console.print("  Would POST scrubbed MACF to https://api.aiq.dev/v1/evaluate")
-    console.print("  Would receive evaluation_id, overall_score, model_scores, layer_scores")
+    # --- Resolve role category ---
+    if role is None:
+        # Fall back to profile role, then prompt
+        if profile and profile.role_category:
+            role = profile.role_category
+        else:
+            role = click.prompt(
+                "Your role category",
+                type=click.Choice(
+                    ["engineering", "product", "regulatory", "executive",
+                     "marketing", "data_analytics", "design"],
+                    case_sensitive=False,
+                ),
+            )
+
+    # --- Step 5: Transmit ---
+    console.print("[bold]Step 5/7:[/bold] Submitting evaluation...")
+    token_store = TokenStore()
+    if not token_store.is_authenticated:
+        console.print("[red]Not authenticated. Run 'aiq login' first.[/red]")
+        raise SystemExit(1)
+
+    token = token_store.load_token()
+    client = AIQClient(token=token)
+
+    try:
+        with console.status("[bold cyan]Submitting evaluation..."):
+            evaluation_id = client.submit_evaluation(
+                config=approved_doc,
+                role_category=role,
+            )
+    except Exception as e:
+        console.print(f"[red]Submission failed: {e}[/red]")
+        raise SystemExit(1)
+
+    console.print(f"  [green]Submitted![/green] Evaluation ID: {evaluation_id}")
     console.print()
 
-    # --- Generate local PDF report ---
+    # --- Step 6: Poll for results ---
+    console.print("[bold]Step 6/7:[/bold] Waiting for evaluation to complete...")
+    with console.status("[bold cyan]Evaluating across 4 frontier models...") as status:
+        timeout_seconds = 600
+        poll_interval = 5
+        elapsed = 0
+
+        while elapsed < timeout_seconds:
+            eval_status = client.get_status(evaluation_id)
+
+            if eval_status.status == "completed":
+                console.print("  [green]Evaluation complete![/green]")
+                break
+            elif eval_status.status == "failed":
+                console.print(f"  [red]Evaluation failed: {eval_status.error}[/red]")
+                raise SystemExit(1)
+
+            status.update(
+                f"[bold cyan]Status: {eval_status.status} ({elapsed}s elapsed)..."
+            )
+            time.sleep(poll_interval)
+            elapsed += poll_interval
+        else:
+            console.print("[red]Evaluation timed out after 10 minutes.[/red]")
+            raise SystemExit(1)
+
+    console.print()
+
+    # --- Step 7: Generate PDF with real results ---
+    console.print("[bold]Step 7/7:[/bold] Generating report...")
+    results = eval_status.result or {}
+
     output_path = Path(output)
     try:
         from aiq.report.pdf import PdfReportGenerator, ReportData
 
         report_data = ReportData(
             user_email=profile.email if profile and profile.email else "Not provided",
-            role_category=profile.role_category if profile and profile.role_category else "Unknown",
-            overall_score=0,
-            model_scores={"claude": 0, "gpt": 0, "gemini": 0},
-            layer_scores={
-                "execution": 0,
-                "robustness": 0,
-                "constraint_satisfaction": 0,
-                "ground_truth": 0,
-                "telemetry": 0,
-                "ai_judge": 0,
-            },
-            challenge_version="v1.0",
-            evaluation_id="stub-evaluation",
+            role_category=role,
+            overall_score=results.get("overall_score", 0),
+            model_scores=results.get("model_scores", {}),
+            layer_scores=results.get("layer_scores", {}),
+            challenge_version=results.get("challenge_version", "v1.0"),
+            evaluation_id=evaluation_id,
+            evaluated_at=eval_status.completed_at or "",
         )
         generator = PdfReportGenerator()
         generator.generate(report_data, output_path)
-        console.print(f"[green]Local PDF report saved:[/green] [bold]{output_path}[/bold]")
+        console.print(f"  [green]PDF report saved:[/green] [bold]{output_path}[/bold]")
     except Exception as e:
-        console.print(f"[yellow]PDF generation skipped:[/yellow] {e}")
+        console.print(f"  [yellow]PDF generation skipped:[/yellow] {e}")
 
     console.print()
     console.print(
         Panel.fit(
-            "[bold green]Evaluation complete![/bold green]\n"
-            "[dim]Real scores will be available once the AIQ API is live.[/dim]",
+            f"[bold green]Evaluation complete![/bold green]\n"
+            f"Overall AIQ Score: [bold]{results.get('overall_score', 'N/A')}[/bold]",
             title="AIQ Evaluation",
         )
     )
