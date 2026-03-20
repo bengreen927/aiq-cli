@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Iterator, Tuple
+
 from aiq.models import ScanResult  # noqa: TCH001
 from aiq.scanner.base import BaseScanner  # noqa: TCH001
 from aiq.scanner.claude import ClaudeScanner
@@ -34,6 +36,11 @@ class ScannerRegistry:
             result = scanner.scan()
             results.append(result)
         return results
+
+    def iter_scanners(self) -> Iterator[Tuple[str, BaseScanner]]:
+        """Iterate over registered scanners as (name, scanner) tuples."""
+        for scanner in self._scanners:
+            yield scanner.name, scanner
 
     @property
     def scanner_names(self) -> list[str]:

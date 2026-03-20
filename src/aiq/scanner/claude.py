@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from aiq.models import ItemCategory, ScannedItem, ScanResult
 from aiq.scanner.base import BaseScanner
@@ -11,7 +12,7 @@ from aiq.scanner.base import BaseScanner
 class ClaudeScanner(BaseScanner):
     """Scans Claude Code configuration files."""
 
-    def __init__(self, home_dir: Path | None = None) -> None:
+    def __init__(self, home_dir: Optional[Path] = None) -> None:
         self._home_dir = home_dir or Path.home()
 
     @property
@@ -72,9 +73,9 @@ class ClaudeScanner(BaseScanner):
             return
 
         for skill_dir in sorted(skills_dir.iterdir()):
-            if not skill_dir.is_dir():
-                continue
-            # Skip symlinks (Smithery skills, etc.)
+            # Check symlinks first — is_dir() follows symlinks, so a
+            # symlinked directory would pass the is_dir() gate and the
+            # is_symlink() check below would never be reached.
             if skill_dir.is_symlink():
                 result.items.append(
                     ScannedItem(
@@ -84,6 +85,8 @@ class ClaudeScanner(BaseScanner):
                         metadata={"symlink": True, "target": str(skill_dir.resolve())},
                     )
                 )
+                continue
+            if not skill_dir.is_dir():
                 continue
 
             # Read all markdown files in the skill directory
@@ -134,32 +137,31 @@ class ClaudeScanner(BaseScanner):
         """Scan memory/ directory and project memory files."""
         # Global memory
         memory_dir = claude_dir / "memory"
-        if not memory_dir.is_dir():
-            # Also check projects/ for memory files
-            projects_dir = claude_dir / "projects"
-            if projects_dir.is_dir():
-                for mem_file in projects_dir.rglob("MEMORY.md"):
-                    content = mem_file.read_text(encoding="utf-8", errors="replace")
-                    result.items.append(
-                        ScannedItem(
-                            source=str(mem_file),
-                            category=ItemCategory.MEMORY,
-                            content=content,
-                            metadata={
-                                "line_count": len(content.splitlines()),
-                                "scope": "project",
-                            },
-                        )
+        if memory_dir.is_dir():
+            for mem_file in sorted(memory_dir.rglob("*.md")):
+                content = mem_file.read_text(encoding="utf-8", errors="replace")
+                result.items.append(
+                    ScannedItem(
+                        source=str(mem_file),
+                        category=ItemCategory.MEMORY,
+                        content=content,
+                        metadata={"line_count": len(content.splitlines()), "scope": "global"},
                     )
-            return
-
-        for mem_file in sorted(memory_dir.rglob("*.md")):
-            content = mem_file.read_text(encoding="utf-8", errors="replace")
-            result.items.append(
-                ScannedItem(
-                    source=str(mem_file),
-                    category=ItemCategory.MEMORY,
-                    content=content,
-                    metadata={"line_count": len(content.splitlines()), "scope": "global"},
                 )
-            )
+
+        # Project memory
+        projects_dir = claude_dir / "projects"
+        if projects_dir.is_dir():
+            for mem_file in projects_dir.rglob("MEMORY.md"):
+                content = mem_file.read_text(encoding="utf-8", errors="replace")
+                result.items.append(
+                    ScannedItem(
+                        source=str(mem_file),
+                        category=ItemCategory.MEMORY,
+                        content=content,
+                        metadata={
+                            "line_count": len(content.splitlines()),
+                            "scope": "project",
+                        },
+                    )
+                )

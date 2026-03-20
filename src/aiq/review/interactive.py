@@ -67,13 +67,13 @@ class ReviewSession:
         return dict(self._decisions)
 
     def get_approved_document(self) -> MacfDocument:
-        """Build a new MACF document containing only approved/pending entries."""
+        """Build a new MACF document containing only approved entries."""
         domain: list[MacfEntry] = []
         workflow: list[MacfEntry] = []
         tools: list[MacfEntry] = []
 
         for i, (section, entry) in enumerate(self._entries):
-            if self._decisions[i] == ReviewDecision.REDACTED:
+            if self._decisions[i] != ReviewDecision.APPROVED:
                 continue
             if section == "domain_knowledge":
                 domain.append(entry)

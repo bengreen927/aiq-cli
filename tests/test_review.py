@@ -49,8 +49,11 @@ def test_review_session_lists_all_entries() -> None:
 def test_review_session_redact_entry() -> None:
     doc = _make_doc()
     session = ReviewSession(doc)
-    # Redact the first entry
+    # Redact the first entry, approve the rest
     session.redact(0)
+    session.approve(1)
+    session.approve(2)
+    session.approve(3)
     approved = session.get_approved_document()
     assert len(approved.domain_knowledge) == 1  # Was 2, now 1
     assert approved.domain_knowledge[0].source == "skill:testing"
@@ -71,6 +74,8 @@ def test_review_session_redact_multiple() -> None:
     session = ReviewSession(doc)
     session.redact(0)
     session.redact(1)
+    session.approve(2)
+    session.approve(3)
     approved = session.get_approved_document()
     total = (
         len(approved.domain_knowledge)

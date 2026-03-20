@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 from aiq.models import ItemCategory, ScannedItem, ScanResult
 from aiq.scanner.base import BaseScanner
@@ -12,7 +13,7 @@ from aiq.scanner.base import BaseScanner
 class SystemScanner(BaseScanner):
     """Scans system-wide tool installations and configurations."""
 
-    def __init__(self, home_dir: Path | None = None) -> None:
+    def __init__(self, home_dir: Optional[Path] = None) -> None:
         self._home_dir = home_dir or Path.home()
 
     @property
@@ -40,14 +41,17 @@ class SystemScanner(BaseScanner):
 
         return result
 
-    def _run_command(self, cmd: list[str], timeout: int = 30) -> str | None:
+    def _run_command(self, cmd: list[str], timeout: int = 30) -> Optional[str]:
         """Run a shell command and return stdout, or None on failure."""
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return None
         if proc.returncode != 0:
             return None
         return proc.stdout

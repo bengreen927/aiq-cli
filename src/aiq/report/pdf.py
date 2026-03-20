@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 class ReportData(BaseModel):
     """Data needed to generate the PDF report."""
 
-    user_email: str = "[EMAIL]"
+    user_email: str = "Not provided"
     role_category: str = ""
     overall_score: int = 0
     model_scores: dict[str, int] = Field(default_factory=dict)

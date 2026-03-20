@@ -26,11 +26,11 @@ def get_patterns() -> list[PatternEntry]:
         (
             "api_key",
             re.compile(
-                r"(?:(?:api[_-]?key|token|secret|password|credential|auth)"
-                r"[\s]*[=:]\s*['\"]?)([A-Za-z0-9_\-]{20,})['\"]?",
+                r"((?:api[_-]?key|token|secret|password|credential|auth)"
+                r"[\s]*[=:]\s*['\"]?)[A-Za-z0-9_\-]{20,}['\"]?",
                 re.IGNORECASE,
             ),
-            "[API_KEY]",
+            r"\1[API_KEY]",
         ),
         # API keys by prefix (sk-, pk-, ghp_, etc.)
         (

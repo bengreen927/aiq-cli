@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 from aiq.models import ItemCategory, ScannedItem, ScanResult
 from aiq.scanner.base import BaseScanner
@@ -12,7 +13,7 @@ from aiq.scanner.base import BaseScanner
 class GitScanner(BaseScanner):
     """Scans Git configuration files and features."""
 
-    def __init__(self, home_dir: Path | None = None) -> None:
+    def __init__(self, home_dir: Optional[Path] = None) -> None:
         self._home_dir = home_dir or Path.home()
 
     @property
@@ -73,17 +74,24 @@ class GitScanner(BaseScanner):
         return items
 
     def _extract_section(self, content: str, section_name: str) -> str:
-        """Extract a [section] from gitconfig text."""
+        """Extract a [section] and its subsections from gitconfig text."""
         lines = content.splitlines()
         in_section = False
         section_lines: list[str] = []
+        section_lower = section_name.lower()
 
         for line in lines:
             stripped = line.strip()
-            if stripped.lower() == f"[{section_name}]":
+            if stripped.lower().startswith(f"[{section_lower}]") or stripped.lower().startswith(f"[{section_lower} "):
                 in_section = True
                 continue
             elif stripped.startswith("[") and in_section:
+                # Check if this is a subsection of the current section
+                header_lower = stripped.lower()
+                if header_lower.startswith(f"[{section_lower} ") or header_lower.startswith(f"[{section_lower}\""):
+                    # Subsection like [core "autocrlf"] — keep collecting
+                    continue
+                # Different section entirely — stop
                 break
             elif in_section and stripped:
                 # Skip lines that look like they contain PII

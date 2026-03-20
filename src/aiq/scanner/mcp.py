@@ -6,7 +6,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Optional
 
 from aiq.models import ItemCategory, ScannedItem, ScanResult
 from aiq.scanner.base import BaseScanner
@@ -21,7 +21,7 @@ _SECRET_FLAGS = re.compile(
 class McpScanner(BaseScanner):
     """Scans MCP server configurations from .mcp.json files and claude mcp list."""
 
-    def __init__(self, search_dirs: list[Path] | None = None) -> None:
+    def __init__(self, search_dirs: Optional[List[Path]] = None) -> None:
         self._search_dirs = search_dirs or [Path.cwd(), Path.home()]
 
     @property
@@ -77,7 +77,9 @@ class McpScanner(BaseScanner):
 
         return items
 
-    def _sanitize_config(self, config: Any, _next_is_secret: bool = False) -> Any:
+    def _sanitize_config(
+        self, config: Any, _next_is_secret: bool = False, _parent_key: str = ""
+    ) -> Any:
         """Remove secret-looking values from MCP config."""
         if isinstance(config, dict):
             sanitized: dict[str, Any] = {}
@@ -89,7 +91,7 @@ class McpScanner(BaseScanner):
                 ):
                     sanitized[key] = "[REDACTED]"
                 else:
-                    sanitized[key] = self._sanitize_config(value)
+                    sanitized[key] = self._sanitize_config(value, _parent_key=lower_key)
             return sanitized
         elif isinstance(config, list):
             result: list[Any] = []
@@ -102,12 +104,16 @@ class McpScanner(BaseScanner):
                     result.append(item)
                     redact_next = True
                 else:
-                    result.append(self._sanitize_config(item))
+                    result.append(self._sanitize_config(item, _parent_key=_parent_key))
             return result
         elif isinstance(config, str):
-            # Redact long opaque strings that look like tokens
-            if len(config) > 20 and re.match(r"^[A-Za-z0-9_\-]+$", config):
-                return "[REDACTED]"
+            # Only redact long opaque strings when the parent key looks sensitive
+            if _parent_key and any(
+                s in _parent_key
+                for s in ("token", "secret", "key", "password", "credential", "auth", "api_key")
+            ):
+                if len(config) > 20 and re.match(r"^[A-Za-z0-9_\-]+$", config):
+                    return "[REDACTED]"
             return config
         return config
 

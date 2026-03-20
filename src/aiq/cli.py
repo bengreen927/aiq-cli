@@ -139,19 +139,15 @@ def scan() -> None:
     registry = ScannerRegistry.default()
 
     all_results = []
-    for scanner_name in registry.scanner_names:
+    for scanner_name, scanner in registry.iter_scanners():
         console.print(f"  Scanning [bold]{scanner_name}[/bold]...", end="")
-        # Run scanner individually to show live progress
-        for scanner in registry._scanners:  # noqa: SLF001
-            if scanner.name == scanner_name:
-                result = scanner.scan()
-                all_results.append(result)
-                if result.errors:
-                    n_err = len(result.errors)
-                    console.print(f" [yellow]{result.item_count} items[/yellow] ({n_err} errors)")
-                else:
-                    console.print(f" [green]{result.item_count} items[/green]")
-                break
+        result = scanner.scan()
+        all_results.append(result)
+        if result.errors:
+            n_err = len(result.errors)
+            console.print(f" [yellow]{result.item_count} items[/yellow] ({n_err} errors)")
+        else:
+            console.print(f" [green]{result.item_count} items[/green]")
 
     console.print()
 
@@ -283,7 +279,7 @@ def evaluate(output: str, auto_approve: bool) -> None:
                 console.print(f"  Approved remaining {session.total_entries - idx} entries.")
                 break
             elif choice.lower() == "q":
-                console.print("  Exiting review. Only previously approved entries will be used.")
+                console.print("  Exiting review. Unreviewed entries will be excluded.")
                 break
             else:
                 session.approve(idx)
@@ -314,7 +310,7 @@ def evaluate(output: str, auto_approve: bool) -> None:
         from aiq.report.pdf import PdfReportGenerator, ReportData
 
         report_data = ReportData(
-            user_email=profile.email if profile and profile.email else "[not set]",
+            user_email=profile.email if profile and profile.email else "Not provided",
             role_category=profile.role_category if profile and profile.role_category else "Unknown",
             overall_score=0,
             model_scores={"claude": 0, "gpt": 0, "gemini": 0},
