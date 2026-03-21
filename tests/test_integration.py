@@ -93,10 +93,10 @@ def test_scan_fixture_finds_skill() -> None:
 
 
 def test_registry_scan_produces_results() -> None:
-    """Default registry runs without crashing and returns 5 results."""
+    """Default registry runs without crashing and returns 6 results."""
     registry = ScannerRegistry.default()
     results = registry.scan_all()
-    assert len(results) == 5
+    assert len(results) == 6
     for result in results:
         assert isinstance(result, ScanResult)
 

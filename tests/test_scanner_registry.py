@@ -58,9 +58,9 @@ def test_scan_all_empty_registry() -> None:
     assert results == []
 
 
-def test_default_registry_has_five_scanners() -> None:
+def test_default_registry_has_six_scanners() -> None:
     registry = ScannerRegistry.default()
-    assert len(registry.scanner_names) == 5
+    assert len(registry.scanner_names) == 6
 
 
 def test_default_registry_scanner_names() -> None:
@@ -71,14 +71,15 @@ def test_default_registry_scanner_names() -> None:
     assert "system" in names
     assert "mcp" in names
     assert "git" in names
+    assert "iteration" in names
 
 
 def test_default_registry_scan_all_returns_results() -> None:
     """Default registry can run without errors (results may be empty on CI)."""
     registry = ScannerRegistry.default()
     results = registry.scan_all()
-    # Should return exactly 5 results
-    assert len(results) == 5
+    # Should return exactly 6 results
+    assert len(results) == 6
     # Each result should have the right scanner name
     for result in results:
         assert result.scanner_name in registry.scanner_names

@@ -9,6 +9,7 @@ from aiq.scanner.base import BaseScanner  # noqa: TCH001
 from aiq.scanner.claude import ClaudeScanner
 from aiq.scanner.cursor import CursorScanner
 from aiq.scanner.git import GitScanner
+from aiq.scanner.iteration import IterationScanner
 from aiq.scanner.mcp import McpScanner
 from aiq.scanner.system import SystemScanner
 
@@ -49,11 +50,12 @@ class ScannerRegistry:
 
     @classmethod
     def default(cls) -> ScannerRegistry:
-        """Build the default registry with all 5 built-in scanners."""
+        """Build the default registry with all 6 built-in scanners."""
         registry = cls()
         registry.register(ClaudeScanner())
         registry.register(CursorScanner())
         registry.register(SystemScanner())
         registry.register(McpScanner())
         registry.register(GitScanner())
+        registry.register(IterationScanner())
         return registry

@@ -22,6 +22,7 @@ class ItemCategory(str, Enum):
     PLUGIN = "plugin"
     SHELL_CONFIG = "shell_config"
     GIT_CONFIG = "git_config"
+    ITERATION_METRICS = "ITERATION_METRICS"
 
 
 class ScannedItem(BaseModel):
