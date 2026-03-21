@@ -66,6 +66,47 @@ def test_poll_status_returns_status() -> None:
     assert status.result["aggregate_score"] == 72.5
 
 
+def test_submit_evaluation_includes_iteration_metrics() -> None:
+    """iteration_metrics should appear in the submitted payload."""
+    client = AIQClient(base_url="http://localhost:8000", token="test-token")
+    mock_response = MagicMock()
+    mock_response.status_code = 202
+    mock_response.json.return_value = {
+        "evaluation_id": "eval-456",
+        "status": "pending",
+        "message": "Queued",
+    }
+    mock_response.raise_for_status = MagicMock()
+
+    metrics = {"total_iterations": 42, "avg_score": 0.87}
+
+    with patch("aiq.api.client.httpx.post", return_value=mock_response) as mock_post:
+        result = client.submit_evaluation(
+            config=_make_doc(),
+            role_category="engineering",
+            iteration_metrics=metrics,
+        )
+
+    assert result == "eval-456"
+    payload = mock_post.call_args[1]["json"]
+    assert payload["iteration_metrics"] == metrics
+
+
+def test_submit_evaluation_iteration_metrics_defaults_to_empty() -> None:
+    """iteration_metrics should default to an empty dict when not provided."""
+    client = AIQClient(base_url="http://localhost:8000", token="test-token")
+    mock_response = MagicMock()
+    mock_response.status_code = 202
+    mock_response.json.return_value = {"evaluation_id": "eval-789", "status": "pending"}
+    mock_response.raise_for_status = MagicMock()
+
+    with patch("aiq.api.client.httpx.post", return_value=mock_response) as mock_post:
+        client.submit_evaluation(config=_make_doc(), role_category="engineering")
+
+    payload = mock_post.call_args[1]["json"]
+    assert payload["iteration_metrics"] == {}
+
+
 def test_submit_raises_on_auth_error() -> None:
     """Client should raise on 401."""
     client = AIQClient(base_url="http://localhost:8000", token="bad-token")

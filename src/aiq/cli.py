@@ -222,6 +222,15 @@ def evaluate(output: str, auto_approve: bool, role: Optional[str]) -> None:  # n
     console.print(f"  Found [green]{n_items}[/green] items across {n_scanners} scanners.")
     console.print()
 
+    # Extract iteration metrics from scan results
+    iteration_metrics = {}
+    for scan_result in all_results:
+        if scan_result.scanner_name == "iteration":
+            for item in scan_result.items:
+                if hasattr(item, 'metadata') and item.metadata:
+                    iteration_metrics = item.metadata
+                    break
+
     # --- Step 2: Extract MACF ---
     console.print("[bold]Step 2/7:[/bold] Extracting configuration (MACF)...")
     extractor = MacfExtractor()
@@ -339,6 +348,7 @@ def evaluate(output: str, auto_approve: bool, role: Optional[str]) -> None:  # n
             evaluation_id = client.submit_evaluation(
                 config=approved_doc,
                 role_category=role,
+                iteration_metrics=iteration_metrics,
             )
     except Exception as e:
         console.print(f"[red]Submission failed: {e}[/red]")

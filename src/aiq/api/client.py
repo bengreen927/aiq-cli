@@ -60,12 +60,14 @@ class AIQClient:
         config: MacfDocument,
         role_category: str,
         temporal_fingerprint: Optional[Dict[str, Any]] = None,
+        iteration_metrics: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Submit MACF config for evaluation. Returns evaluation_id."""
         payload = {
             "config": self._macf_to_api_format(config),
             "role_category": role_category,
             "temporal_fingerprint": temporal_fingerprint or {},
+            "iteration_metrics": iteration_metrics or {},
         }
         response = httpx.post(
             f"{self.base_url}/evaluate",
